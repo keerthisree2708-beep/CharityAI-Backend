@@ -14,7 +14,27 @@ exports.getDashboard = async (req, res, next) => {
     // Real DB queries
     const totalDonations = await Donation.countDocuments({ assignedNgoId: ngoId });
     const pendingDonations = await Donation.countDocuments({ assignedNgoId: ngoId, status: 'pending' });
+    const acceptedDonations = await Donation.countDocuments({ assignedNgoId: ngoId, status: 'accepted' });
     const deliveredDonations = await Donation.countDocuments({ assignedNgoId: ngoId, status: 'delivered' });
+
+    // Resource sums
+    const allDonations = await Donation.find({ assignedNgoId: ngoId });
+    let foodCount = 0;
+    let booksCount = 0;
+    let clothesCount = 0;
+    let moneyCount = 0;
+    let beneficiariesCount = 0;
+
+    allDonations.forEach(d => {
+      const qty = parseInt(d.quantity) || 1;
+      if (d.status === 'delivered') {
+        beneficiariesCount += Math.round(qty * 1.5) || 1;
+        if (d.category === 'food') foodCount += qty;
+        else if (d.category === 'books') booksCount += qty;
+        else if (d.category === 'clothes') clothesCount += qty;
+        else if (d.category === 'money') moneyCount += qty;
+      }
+    });
 
     // Latest 5 pending donation requests
     const requests = await Donation.find({ assignedNgoId: ngoId, status: 'pending' })
@@ -23,13 +43,23 @@ exports.getDashboard = async (req, res, next) => {
       .limit(5);
 
     const stats = [
-      { v: totalDonations.toString(), l: 'Total Donations', color: '#2563EB', bg: '#1A2657' },
-      { v: pendingDonations.toString(), l: 'Pending', color: '#F59E0B', bg: '#2A2005' },
-      { v: deliveredDonations.toString(), l: 'Delivered', color: '#4ADE80', bg: '#0A2A14' },
-      { v: totalDonations > 0 ? `${Math.round((deliveredDonations / totalDonations) * 100)}%` : '0%', l: 'Success Rate', color: '#4ADE80', bg: '#0A2A14' },
+      { v: totalDonations.toString(), l: 'Total Donations', color: '#2563EB', bg: 'rgba(37, 99, 235, 0.15)' },
+      { v: pendingDonations.toString(), l: 'Pending Donations', color: '#F59E0B', bg: 'rgba(245, 158, 11, 0.15)' },
+      { v: acceptedDonations.toString(), l: 'Accepted Donations', color: '#10B981', bg: 'rgba(16, 185, 129, 0.15)' },
+      { v: deliveredDonations.toString(), l: 'Delivered Donations', color: '#4ADE80', bg: 'rgba(74, 222, 128, 0.15)' },
     ];
 
-    sendResponse(res, 200, true, { stats, requests });
+    sendResponse(res, 200, true, { 
+      stats, 
+      requests,
+      analytics: {
+        foodCount,
+        booksCount,
+        clothesCount,
+        moneyCount,
+        beneficiariesCount: beneficiariesCount || (deliveredDonations * 3)
+      }
+    });
   } catch (error) {
     next(error);
   }
