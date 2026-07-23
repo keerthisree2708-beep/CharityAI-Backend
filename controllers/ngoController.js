@@ -1,6 +1,8 @@
 const Requirement = require('../models/Requirement');
 const Donation = require('../models/Donation');
 const Tracking = require('../models/Tracking');
+const User = require('../models/User');
+const Notification = require('../models/Notification');
 const { sendResponse } = require('../utils/helpers');
 const { requirementValidation } = require('../validations');
 
@@ -99,6 +101,25 @@ exports.createRequirement = async (req, res, next) => {
       urgency: urgency || 'medium',
       needByDate: needByDate ? new Date(needByDate) : undefined,
     });
+
+    // Create notifications for all donors in the system
+    try {
+      const ngoUser = await User.findById(req.user.id);
+      const ngoName = ngoUser ? ngoUser.name : 'NGO Partner';
+      const donors = await User.find({ role: 'donor' });
+      
+      const notifPromises = donors.map(donor => {
+        return Notification.create({
+          userId: donor._id,
+          type: 'emergency_request',
+          title: `🚨 Emergency: ${category.toUpperCase()} Needed`,
+          message: `${ngoName} has posted a requirement for ${quantity || 'supplies'}. Click to view details.`,
+        });
+      });
+      await Promise.all(notifPromises);
+    } catch (notifErr) {
+      console.warn('Failed to send requirements notifications:', notifErr.message);
+    }
 
     sendResponse(res, 201, true, requirement, 'Requirement created successfully');
   } catch (error) {
