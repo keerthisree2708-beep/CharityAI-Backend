@@ -16,3 +16,9 @@ npm-debug.log*
 
 # Editor
 .DS_Store
+
+# Local k6 test binaries and summaries
+bin/
+summary.json
+reports/
+
